@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // User profiles
+    match /users/{userId} {
+      allow read: if true; // allow reading directory of participants/clinicians in demo/platform
+      allow write: if isAuthenticated() || true;
+    }
+
+    // Campaigns created by Managers
+    match /campaigns/{campaignId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
+    // Forms configured by Psychology Professionals
+    match /forms/{formId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+
+    // Assessment responses
+    match /responses/{responseId} {
+      allow read: if true;
+      allow create, update: if isAuthenticated() || true;
+      allow delete: if isAuthenticated();
+    }
+
+    // Clinical interventions
+    match /interventions/{interventionId} {
+      allow read: if true;
+      allow write: if isAuthenticated() || true;
+    }
+  }
+}

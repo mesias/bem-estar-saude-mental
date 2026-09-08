@@ -1,0 +1,6 @@
+{
+  "name": "Bem-Estar Saúde Mental",
+  "description": "Multi-persona mental health assessment platform with campaign management, custom clinical forms, risk alerts, real-time analytics, and Expo mobile architecture.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

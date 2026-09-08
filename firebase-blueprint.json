@@ -1,0 +1,112 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profiles with roles and notification preferences",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["manager", "psychologist", "user"] },
+        "organization": { "type": "string" },
+        "pushToken": { "type": "string" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["uid", "name", "email", "role"]
+    },
+    "Campaign": {
+      "title": "Campaign",
+      "description": "Campaign created by Managers for cohort wellbeing initiatives",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "targetAudience": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "draft", "archived"] },
+        "notificationMode": { "type": "string", "enum": ["strict_deadlines", "flexible_discretionary"] },
+        "deadlineDate": { "type": "string" },
+        "reminderFrequency": { "type": "string" },
+        "createdByManagerId": { "type": "string" },
+        "assignedPsychologistIds": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["title", "status", "notificationMode"]
+    },
+    "AssessmentForm": {
+      "title": "AssessmentForm",
+      "description": "Clinical assessment form designed by Psychology professionals",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "psychologistId": { "type": "string" },
+        "questions": { "type": "array" },
+        "safetyThreshold": { "type": "number" },
+        "personalizedResources": { "type": "array" },
+        "createdAt": { "type": "string" }
+      },
+      "required": ["campaignId", "title", "questions"]
+    },
+    "FormResponse": {
+      "title": "FormResponse",
+      "description": "Submitted assessment responses with computed wellbeing scores and risk detection",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "campaignId": { "type": "string" },
+        "formId": { "type": "string" },
+        "userId": { "type": "string" },
+        "userName": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "answers": { "type": "object" },
+        "calculatedScore": { "type": "number" },
+        "riskLevel": { "type": "string", "enum": ["low", "moderate", "high", "critical"] },
+        "isRiskAlert": { "type": "boolean" },
+        "alertAcknowledged": { "type": "boolean" },
+        "submittedAt": { "type": "string" }
+      },
+      "required": ["campaignId", "formId", "userId", "answers", "calculatedScore"]
+    },
+    "ClinicalIntervention": {
+      "title": "ClinicalIntervention",
+      "description": "Actions taken by psychology professionals when safety thresholds are triggered",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "responseId": { "type": "string" },
+        "userId": { "type": "string" },
+        "psychologistId": { "type": "string" },
+        "actionType": { "type": "string" },
+        "notes": { "type": "string" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["responseId", "userId", "psychologistId", "actionType"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": {
+      "schema": "UserProfile",
+      "description": "User profile documents"
+    },
+    "/campaigns/{campaignId}": {
+      "schema": "Campaign",
+      "description": "Campaign documents"
+    },
+    "/forms/{formId}": {
+      "schema": "AssessmentForm",
+      "description": "Forms created by psychologists"
+    },
+    "/responses/{responseId}": {
+      "schema": "FormResponse",
+      "description": "User responses with scores and risk status"
+    },
+    "/interventions/{interventionId}": {
+      "schema": "ClinicalIntervention",
+      "description": "Psychologist clinical interventions and logs"
+    }
+  }
+}
