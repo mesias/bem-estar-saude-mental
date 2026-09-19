@@ -13,9 +13,20 @@ import {
   FileSpreadsheet,
   Check,
   Search,
-  Filter
+  Filter,
+  GraduationCap,
+  Award,
+  BookOpen,
+  ShieldCheck
 } from 'lucide-react';
-import { Campaign, NotificationMode, ReminderFrequency, FormResponse } from '../../types';
+import {
+  Campaign,
+  NotificationMode,
+  ReminderFrequency,
+  FormResponse,
+  AcademicLevel,
+  StudyDesignType
+} from '../../types';
 import { dataService } from '../../services/dataService';
 
 interface ManagerViewProps {
@@ -23,12 +34,14 @@ interface ManagerViewProps {
   responses: FormResponse[];
   onCampaignCreated: () => void;
   onSelectCampaignForForms?: (campaignId: string) => void;
+  onOpenStatisticalLab?: () => void;
 }
 
 export const ManagerView: React.FC<ManagerViewProps> = ({
   campaigns,
   responses,
   onCampaignCreated,
+  onOpenStatisticalLab,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>(campaigns[0]?.id || '');
@@ -36,7 +49,7 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
   const [csvDownloaded, setCsvDownloaded] = useState(false);
   const [dispatchSuccess, setDispatchSuccess] = useState<string | null>(null);
 
-  // Form State for new campaign
+  // Form State for new campaign / research study
   const [newTitle, setNewTitle] = useState('');
   const [newDescription, setNewDescription] = useState('');
   const [newTargetAudience, setNewTargetAudience] = useState('');
@@ -44,8 +57,17 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
   const [newDeadlineDate, setNewDeadlineDate] = useState(
     new Date(Date.now() + 14 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   );
-  const [newReminderFrequency, setNewReminderFrequency] = useState<ReminderFrequency>('every_3_days');
-  const [newParticipantCount, setNewParticipantCount] = useState(50);
+  const [newReminderFrequency, setNewReminderFrequency] = useState<ReminderFrequency>('weekly');
+  const [newParticipantCount, setNewParticipantCount] = useState(60);
+
+  // Academic & Research metadata fields
+  const [newAcademicLevel, setNewAcademicLevel] = useState<AcademicLevel>('mestrado');
+  const [newStudyDesign, setNewStudyDesign] = useState<StudyDesignType>('longitudinal_weekly');
+  const [newGraduateProgram, setNewGraduateProgram] = useState('Programa de Pós-Graduação em Psicologia (PPGP)');
+  const [newLeadResearcher, setNewLeadResearcher] = useState('');
+  const [newAcademicAdvisor, setNewAcademicAdvisor] = useState('');
+  const [newEthicsApprovalCode, setNewEthicsApprovalCode] = useState('CAAE: 54910222.4.0000.5404');
+  const [newLongitudinalWeeks, setNewLongitudinalWeeks] = useState(8);
 
   // Filter responses
   const activeCampaign = campaigns.find(c => c.id === selectedCampaignId) || campaigns[0];
@@ -66,25 +88,42 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
     await dataService.createCampaign({
       title: newTitle,
       description: newDescription,
-      targetAudience: newTargetAudience || 'Professores e Equipe Escolar',
+      targetAudience: newTargetAudience || 'Professores e Docentes',
       status: 'active',
       notificationMode: newNotificationMode,
       deadlineDate: newNotificationMode === 'strict_deadlines' ? newDeadlineDate : undefined,
       reminderFrequency: newReminderFrequency,
       createdByManagerId: 'mgr-01',
-      createdByName: 'Mariana Rocha (Gestão de RH)',
+      createdByName: newLeadResearcher ? `${newLeadResearcher} (Pesquisa)` : 'Mariana Rocha (Coord. Pesquisa)',
       assignedPsychologistIds: ['psy-01'],
-      participantCount: Number(newParticipantCount) || 30,
+      participantCount: Number(newParticipantCount) || 50,
+      researchMetadata: {
+        academicLevel: newAcademicLevel,
+        studyDesign: newStudyDesign,
+        universityOrInstitute: 'Instituto de Psicologia & Educação',
+        graduateProgram: newGraduateProgram,
+        leadResearcher: newLeadResearcher || 'Pesquisador Responsável',
+        academicAdvisor: newAcademicAdvisor || 'Prof. Orientador PPGP',
+        ethicsApprovalCode: newEthicsApprovalCode,
+        longitudinalTotalWeeks: newStudyDesign === 'longitudinal_weekly' ? newLongitudinalWeeks : undefined,
+        currentWeekIndex: 1,
+        weeklyNotificationDay: 'sunday',
+        weeklyNotificationTime: '19:00',
+        sampleTargetSize: Number(newParticipantCount) || 50,
+        anonymizeInExports: true,
+      }
     });
 
     setShowCreateModal(false);
     setNewTitle('');
     setNewDescription('');
+    setNewLeadResearcher('');
+    setNewAcademicAdvisor('');
     onCampaignCreated();
   };
 
   const handleExportCSV = () => {
-    const csvContent = dataService.generateCSV(activeCampaign?.id);
+    const csvContent = dataService.generateCSV(activeCampaign?.id, true);
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -96,6 +135,15 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
 
     setCsvDownloaded(true);
     setTimeout(() => setCsvDownloaded(false), 3000);
+  };
+
+  const handleTriggerWeeklyTeacherCheckin = () => {
+    if (!activeCampaign) return;
+    dataService.triggerWeeklyTeacherCheckin(activeCampaign.id);
+    setDispatchSuccess(
+      `Disparo semanal realizado! Notificação push enviada para os professores responderem sobre a sua semana letiva.`
+    );
+    setTimeout(() => setDispatchSuccess(null), 5000);
   };
 
   const handleTriggerAutomatedReminder = () => {
@@ -120,29 +168,52 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2">
-            <span className="rounded-md bg-blue-100 px-2 py-0.5 text-xs font-bold text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-              Visão do Gestor de Campanhas
+            <span className="rounded-md bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+              Centro de Pesquisas & Gestão Acadêmica
             </span>
             <span className="text-xs text-slate-500 dark:text-slate-400">
-              Gestão de Engajamento, Prazos & Análise Estatística
+              Mestrado &bull; Doutorado &bull; Coorte Flagship Docente
             </span>
           </div>
           <h2 className="mt-1 text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Painel Geral de Campanhas de Saúde Mental
+            Painel de Estudos Estatísticos & Saúde Mental
           </h2>
           <p className="text-xs text-slate-600 dark:text-slate-400">
-            Configure campanhas com prazos rígidos ou discricionários, monitore a adesão docente e exporte dados para SPSS e R.
+            Gerencie coortes longitudinais com check-ins semanais, estudos de mestrandos/doutorandos e gere saídas para SPSS, R e Python.
           </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {onOpenStatisticalLab && (
+            <button
+              id="btn-open-stat-lab-manager"
+              onClick={onOpenStatisticalLab}
+              className="flex items-center gap-1.5 rounded-xl bg-purple-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-purple-700 transition-colors"
+            >
+              <GraduationCap className="h-4 w-4" />
+              Lab Estatístico (SPSS / R)
+            </button>
+          )}
+
+          {activeCampaign?.researchMetadata?.studyDesign === 'longitudinal_weekly' && (
+            <button
+              id="btn-trigger-weekly-checkin"
+              onClick={handleTriggerWeeklyTeacherCheckin}
+              className="flex items-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition-colors"
+              title="Disparar push semanal para a coorte de professores avaliarem sua semana"
+            >
+              <Send className="h-4 w-4" />
+              Disparar Check-in Semanal
+            </button>
+          )}
+
           <button
             id="btn-export-csv"
             onClick={handleExportCSV}
             className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:hover:bg-slate-700 transition-colors"
           >
             {csvDownloaded ? <Check className="h-4 w-4 text-emerald-500" /> : <FileSpreadsheet className="h-4 w-4 text-emerald-600" />}
-            {csvDownloaded ? 'CSV Baixado!' : 'Exportar CSV (SPSS / R / Python)'}
+            {csvDownloaded ? 'CSV Baixado!' : 'Exportar CSV'}
           </button>
 
           <button
@@ -151,7 +222,7 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
             className="flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-blue-700 transition-colors"
           >
             <Plus className="h-4 w-4" />
-            Nova Campanha
+            Novo Estudo / Campanha
           </button>
         </div>
       </div>
@@ -247,11 +318,28 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                   }`}
                 >
                   <div className="flex items-start justify-between">
-                    <h4 className="text-sm font-bold text-slate-900 dark:text-white">
-                      {camp.title}
-                    </h4>
+                    <div>
+                      {camp.isFlagship && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-bold text-amber-900 dark:bg-amber-950/60 dark:text-amber-200 mb-1">
+                          ★ Flagship Docente Semanal
+                        </span>
+                      )}
+                      {!camp.isFlagship && camp.researchMetadata?.academicLevel && (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-purple-100 px-1.5 py-0.5 text-[9px] font-bold text-purple-900 dark:bg-purple-950/60 dark:text-purple-200 mb-1">
+                          <GraduationCap className="h-2.5 w-2.5" />
+                          {camp.researchMetadata.academicLevel === 'mestrado'
+                            ? 'Mestrado PPGP'
+                            : camp.researchMetadata.academicLevel === 'doutorado'
+                            ? 'Doutorado PPGP'
+                            : 'Pesquisa'}
+                        </span>
+                      )}
+                      <h4 className="text-sm font-bold text-slate-900 dark:text-white">
+                        {camp.title}
+                      </h4>
+                    </div>
                     <span
-                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold shrink-0 ${
                         camp.notificationMode === 'strict_deadlines'
                           ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
                           : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
@@ -264,6 +352,23 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                   <p className="mt-1 text-xs text-slate-600 dark:text-slate-400 line-clamp-2">
                     {camp.description}
                   </p>
+
+                  {camp.researchMetadata && (
+                    <div className="mt-2 flex items-center gap-2 text-[10px] text-slate-500 font-medium">
+                      <span className="rounded bg-slate-100 px-1.5 py-0.5 dark:bg-slate-800">
+                        {camp.researchMetadata.studyDesign === 'longitudinal_weekly'
+                          ? 'Longitudinal Semanal'
+                          : camp.researchMetadata.studyDesign === 'experimental_rct'
+                          ? 'Ensaio RCT'
+                          : 'Transversal'}
+                      </span>
+                      {camp.researchMetadata.ethicsApprovalCode && (
+                        <span className="truncate text-emerald-700 dark:text-emerald-400">
+                          {camp.researchMetadata.ethicsApprovalCode}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400">
                     <span className="flex items-center gap-1">
@@ -343,6 +448,68 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                     : 'Notificação única de lançamento enviada aos docentes, permitindo preenchimento no ritmo e discernimento de cada participante.'}
                 </p>
               </div>
+
+              {/* Research Methodology & Academic Program Details */}
+              {activeCampaign.researchMetadata && (
+                <div className="mb-4 rounded-xl border border-purple-200 bg-purple-50/40 p-4 dark:border-purple-900/40 dark:bg-purple-950/20">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-b border-purple-100 pb-2.5 dark:border-purple-900/40">
+                    <div className="flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                      <span className="text-xs font-bold text-purple-900 dark:text-purple-200">
+                        Metodologia Científica &bull; {activeCampaign.researchMetadata.graduateProgram}
+                      </span>
+                    </div>
+                    {onOpenStatisticalLab && (
+                      <button
+                        onClick={onOpenStatisticalLab}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-purple-700 hover:text-purple-900 dark:text-purple-300 dark:hover:text-purple-100 underline decoration-purple-400"
+                      >
+                        Abrir no Lab Estatístico (SPSS / R / Python) &rarr;
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-500 uppercase">Pesquisador(a) / Orientador(a)</span>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5">
+                        {activeCampaign.researchMetadata.leadResearcher}
+                      </p>
+                      {activeCampaign.researchMetadata.academicAdvisor && (
+                        <p className="text-[11px] text-slate-500">
+                          Orientação: {activeCampaign.researchMetadata.academicAdvisor}
+                        </p>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-500 uppercase">Desenho do Estudo</span>
+                      <p className="font-semibold text-slate-800 dark:text-slate-200 mt-0.5 capitalize">
+                        {activeCampaign.researchMetadata.studyDesign === 'longitudinal_weekly'
+                          ? 'Longitudinal Semanal (Check-in)'
+                          : activeCampaign.researchMetadata.studyDesign === 'experimental_rct'
+                          ? 'Ensaio Clínico RCT'
+                          : 'Transversal'}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        {activeCampaign.researchMetadata.longitudinalTotalWeeks
+                          ? `${activeCampaign.researchMetadata.longitudinalTotalWeeks} semanas previstas (Onda atual: Semana ${activeCampaign.researchMetadata.currentWeekIndex || 1})`
+                          : 'Coleta em onda única'}
+                      </p>
+                    </div>
+
+                    <div>
+                      <span className="text-[10px] font-semibold text-slate-500 uppercase">Comitê de Ética em Pesquisa</span>
+                      <p className="font-semibold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                        {activeCampaign.researchMetadata.ethicsApprovalCode || 'CAAE Aprovado'}
+                      </p>
+                      <p className="text-[11px] text-slate-500">
+                        TCLE Digital & Anonimização Ativa
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Responses & Real-Time Cohort Feed */}
               <div className="space-y-3">
@@ -499,6 +666,116 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                     onChange={e => setNewParticipantCount(Number(e.target.value))}
                     className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
                   />
+                </div>
+              </div>
+
+              {/* Academic Level and Study Design Selector */}
+              <div className="rounded-xl border border-purple-200 bg-purple-50/50 p-4 dark:border-purple-900/50 dark:bg-purple-950/20 space-y-3">
+                <div className="flex items-center gap-2">
+                  <GraduationCap className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                  <label className="block text-xs font-bold text-purple-900 dark:text-purple-200">
+                    Classificação Acadêmica & Desenho Metodológico (Pós-Graduação)
+                  </label>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Nível Acadêmico / Finalidade
+                    </label>
+                    <select
+                      id="select-academic-level"
+                      value={newAcademicLevel}
+                      onChange={e => setNewAcademicLevel(e.target.value as AcademicLevel)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 font-semibold"
+                    >
+                      <option value="mestrado">Dissertação de Mestrado (PPGP)</option>
+                      <option value="doutorado">Tese de Doutorado (PPGP)</option>
+                      <option value="flagship_study">Estudo Insígnia / Flagship Institucional</option>
+                      <option value="pos_doc_docente">Pós-Doutorado / Pesquisa Docente</option>
+                      <option value="iniciacao_cientifica">Iniciação Científica (PIBIC/CNPq)</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Desenho do Estudo Estatístico
+                    </label>
+                    <select
+                      id="select-study-design"
+                      value={newStudyDesign}
+                      onChange={e => setNewStudyDesign(e.target.value as StudyDesignType)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 font-semibold"
+                    >
+                      <option value="longitudinal_weekly">Longitudinal Semanal (Check-in Semanal)</option>
+                      <option value="cross_sectional">Transversal (Onda Única de Coleta)</option>
+                      <option value="experimental_rct">Ensaio Clínico Quase-Experimental / RCT</option>
+                      <option value="psychometric_validation">Validação Psicométrica (EFA / CFA)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Pesquisador(a) Líder (Mestrando/Doutorando)
+                    </label>
+                    <input
+                      id="input-lead-researcher"
+                      type="text"
+                      placeholder="Ex: Luiza Fontes (Mestranda)"
+                      value={newLeadResearcher}
+                      onChange={e => setNewLeadResearcher(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Professor(a) Orientador(a)
+                    </label>
+                    <input
+                      id="input-academic-advisor"
+                      type="text"
+                      placeholder="Ex: Profa. Dra. Helena Siqueira"
+                      value={newAcademicAdvisor}
+                      onChange={e => setNewAcademicAdvisor(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Comitê de Ética CEP/CONEP (CAAE)
+                    </label>
+                    <input
+                      id="input-ethics-code"
+                      type="text"
+                      placeholder="Ex: CAAE: 54910222.4.0000.5404"
+                      value={newEthicsApprovalCode}
+                      onChange={e => setNewEthicsApprovalCode(e.target.value)}
+                      className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                    />
+                  </div>
+
+                  {newStudyDesign === 'longitudinal_weekly' && (
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                        Duração da Coorte (Semanas)
+                      </label>
+                      <input
+                        id="input-longitudinal-weeks"
+                        type="number"
+                        min={2}
+                        max={52}
+                        value={newLongitudinalWeeks}
+                        onChange={e => setNewLongitudinalWeeks(Number(e.target.value))}
+                        className="w-full rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200"
+                      />
+                    </div>
+                  )}
                 </div>
               </div>
 

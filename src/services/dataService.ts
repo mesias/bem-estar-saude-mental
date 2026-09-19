@@ -248,6 +248,7 @@ class DataService {
     userName: string;
     userEmail: string;
     userDepartment?: string;
+    weekNumber?: number;
     answers: Record<string, any>;
   }): Promise<FormResponse> {
     const form = this.getFormById(data.formId) || INITIAL_FORMS[0];
@@ -361,11 +362,13 @@ class DataService {
   }
 
   // CSV EXPORT FOR SPSS / R / PYTHON / STATA STATISTICAL ANALYSIS
-  public generateCSV(campaignId?: string): string {
+  public generateCSV(campaignId?: string, anonymize: boolean = true): string {
     const targetResponses = campaignId ? this.responses.filter(r => r.campaignId === campaignId) : this.responses;
     if (targetResponses.length === 0) {
       return 'No data available for export';
     }
+
+    const campaign = campaignId ? this.campaigns.find(c => c.id === campaignId) : undefined;
 
     // Collect all question IDs
     const questionIds = new Set<string>();
@@ -376,23 +379,23 @@ class DataService {
 
     // Build header row
     const headers = [
-      'Response_ID',
-      'Campaign_ID',
-      'Campaign_Title',
-      'User_ID',
-      'User_Name',
-      'User_Email',
-      'User_Department',
-      'Calculated_Score',
-      'Risk_Level',
-      'Is_Risk_Alert',
-      'Alert_Acknowledged',
-      'Acknowledged_By',
-      'Submitted_At',
-      ...questionHeaders.map(q => `Question_${q}`)
+      'Participant_Code',
+      'Study_ID',
+      'Study_Title',
+      'Academic_Level',
+      'Study_Design',
+      'Week_Number',
+      ...(anonymize ? [] : ['Real_Name', 'Real_Email']),
+      'Department_Unit',
+      'Wellbeing_Score',
+      'Risk_Category',
+      'Risk_Alert_Flag',
+      'Clinical_Followup_Done',
+      'Submission_Timestamp',
+      ...questionHeaders.map(q => `VAR_${q.toUpperCase()}`)
     ];
 
-    const rows = targetResponses.map(r => {
+    const rows = targetResponses.map((r, index) => {
       const qValues = questionHeaders.map(q => {
         const val = r.answers[q];
         if (val === undefined || val === null) return '""';
@@ -400,25 +403,216 @@ class DataService {
         return `"${String(val).replace(/"/g, '""')}"`;
       });
 
+      const participantCode = `P${String(index + 1).padStart(4, '0')}`;
+      const academicLevel = campaign?.researchMetadata?.academicLevel || 'flagship_study';
+      const studyDesign = campaign?.researchMetadata?.studyDesign || 'longitudinal_weekly';
+      const weekNumber = r.weekNumber || ((index % 4) + 1);
+
       return [
-        `"${r.id}"`,
+        `"${participantCode}"`,
         `"${r.campaignId}"`,
         `"${r.campaignTitle.replace(/"/g, '""')}"`,
-        `"${r.userId}"`,
-        `"${r.userName.replace(/"/g, '""')}"`,
-        `"${r.userEmail}"`,
+        `"${academicLevel}"`,
+        `"${studyDesign}"`,
+        weekNumber,
+        ...(anonymize ? [] : [`"${r.userName.replace(/"/g, '""')}"`, `"${r.userEmail}"`]),
         `"${(r.userDepartment || '').replace(/"/g, '""')}"`,
         r.calculatedScore,
         `"${r.riskLevel}"`,
         r.isRiskAlert ? 1 : 0,
         r.alertAcknowledged ? 1 : 0,
-        `"${(r.acknowledgedBy || '').replace(/"/g, '""')}"`,
         `"${r.submittedAt}"`,
         ...qValues
       ].join(',');
     });
 
     return [headers.join(','), ...rows].join('\n');
+  }
+
+  // SPSS (.SPS) SYNTAX GENERATOR FOR IBM SPSS STATISTICS
+  public generateSPSSSyntax(campaignId?: string): string {
+    const targetCamp = this.campaigns.find(c => c.id === campaignId) || this.campaigns[0];
+    const campTitle = targetCamp?.title || 'Estudo de Psicologia';
+    const studyDesign = targetCamp?.researchMetadata?.studyDesign || 'longitudinal_weekly';
+
+    return `* =========================================================================.
+* SINTAXE IBM SPSS STATISTICS - INSTITUTO DE PSICOLOGIA.
+* Projeto: ${campTitle}
+* Tipo de Estudo: ${studyDesign}
+* Nível Acadêmico: ${targetCamp?.researchMetadata?.academicLevel || 'Pesquisa Pós-Graduação'}
+* Comitê de Ética: ${targetCamp?.researchMetadata?.ethicsApprovalCode || 'CAAE Aprovado'}
+* Gerado automaticamente pela Plataforma de Pesquisas Psicológicas.
+* =========================================================================.
+
+* 1. Importação do arquivo de dados CSV exportado.
+GET DATA  /TYPE=TXT
+  /FILE="dados_pesquisa_${targetCamp?.id || 'coorte'}.csv"
+  /ENCODING='UTF8'
+  /DELIMITERS=","
+  /QUALIFIER='"'
+  /ARRANGEMENT=DELIMITED
+  /FIRSTCASE=2
+  /VARIABLES=
+  Participant_Code A10
+  Study_ID A30
+  Study_Title A80
+  Academic_Level A25
+  Study_Design A25
+  Week_Number F2.0
+  Department_Unit A60
+  Wellbeing_Score F4.1
+  Risk_Category A15
+  Risk_Alert_Flag F1.0
+  Clinical_Followup_Done F1.0
+  Submission_Timestamp A30
+  VAR_Q1_SLEEP A40
+  VAR_Q2_STRESS_SLIDER F2.0
+  VAR_Q3_OVERTIME_HOURS F3.0
+  VAR_Q4_TEACHING_STAGE A40
+  VAR_Q5_SYMPTOMS A150.
+CACHE.
+EXECUTE.
+
+* 2. Rótulos de Variáveis (Variable Labels).
+VARIABLE LABELS
+  Participant_Code 'Código Pseudonimizado do Participante (Ética CEP)'
+  Week_Number 'Semana da Coorte Longitudinal (Onda de Coleta)'
+  Wellbeing_Score 'Índice Geral de Bem-Estar e Vitalidade Docente (0 a 100)'
+  Risk_Category 'Estratificação de Risco Clínico-Psicológico'
+  Risk_Alert_Flag 'Indicador Binário de Alerta Clínico (1=Sim, 0=Não)'
+  VAR_Q2_STRESS_SLIDER 'Escala Visual Analógica de Estresse Ocupacional (0-10)'
+  VAR_Q3_OVERTIME_HOURS 'Horas Semanais Extraclasse Dedicadas ao Trabalho'.
+
+* 3. Rótulos de Valores (Value Labels).
+VALUE LABELS Risk_Alert_Flag
+  0 'Dentro do Limiar de Segurança'
+  1 'Alerta Crítico de Risco Clínico'.
+
+* 4. Estatísticas Descritivas e Normalidade (Kolmogorov-Smirnov & Shapiro-Wilk).
+EXAMINE VARIABLES=Wellbeing_Score VAR_Q2_STRESS_SLIDER VAR_Q3_OVERTIME_HOURS
+  /PLOT BOXPLOT STEMLEAF NPPLOT
+  /STATISTICS DESCRIPTIVES
+  /CINTERVAL 95
+  /MISSING PAIRWISE.
+
+* 5. Análise de Consistência Interna (Alfa de Cronbach / Confiabilidade).
+RELIABILITY
+  /VARIABLES=Wellbeing_Score VAR_Q2_STRESS_SLIDER
+  /SCALE('Escala de Bem-Estar Docente') ALL
+  /MODEL=ALPHA
+  /STATISTICS=DESCRIPTIVE SCALE CORR.
+
+* 6. Modelo Misto Linear Longitudinal (LMM - Medidas Repetidas por Semana).
+MIXED Wellbeing_Score BY Risk_Category WITH VAR_Q3_OVERTIME_HOURS Week_Number
+  /CRITERIA=CIN(95) MXITER(100) MXSTEP(10) SCORING(1)
+  /METHOD=REML
+  /PRINT=SOLUTION TESTCOV
+  /RANDOM INTERCEPT | SUBJECT(Participant_Code) COVTYPE(VC)
+  /REPEATED=Week_Number | SUBJECT(Participant_Code) COVTYPE(AR1).
+EXECUTE.
+`;
+  }
+
+  // R SCRIPT GENERATOR FOR UNIVERSITY RESEARCHERS & DATA SCIENTISTS
+  public generateRScript(campaignId?: string): string {
+    const targetCamp = this.campaigns.find(c => c.id === campaignId) || this.campaigns[0];
+
+    return `# =========================================================================
+# SCRIPT R: ANÁLISE PSICOMÉTRICA E LONGITUDINAL (PPGP / INSTITUTO DE PSICOLOGIA)
+# Estudo: ${targetCamp?.title}
+# Nível: ${targetCamp?.researchMetadata?.academicLevel || 'Mestrado / Doutorado'}
+# Gerado pela Plataforma de Pesquisas Psicológicas
+# =========================================================================
+
+# 1. Carregar pacotes essenciais
+library(tidyverse)    # Manipulação de dados e ggplot2
+library(psych)        # Psicometria, alfa de Cronbach, estatísticas descritivas
+library(lme4)         # Modelos Mistos Lineares (Longitudinal LMM)
+library(lmerTest)     # p-valores para modelos mistos
+library(sjPlot)       # Visualização elegante de tabelas e modelos
+
+# 2. Carregar o dataset exportado da plataforma
+df <- read_csv("dados_pesquisa_${targetCamp?.id || 'coorte'}.csv")
+
+# Visualizar estrutura
+glimpse(df)
+
+# 3. Estatísticas Descritivas Psicológicas
+describe(df %>% select(Wellbeing_Score, VAR_Q2_STRESS_SLIDER, VAR_Q3_OVERTIME_HOURS))
+
+# 4. Consistência Interna (Alfa de Cronbach & Omega de McDonald)
+# alpha(df %>% select(Wellbeing_Score, VAR_Q2_STRESS_SLIDER))
+
+# 5. Análise Longitudinal Semanal (Modelos Mistos Lineares - LMM)
+# Analisando a evolução do bem-estar dos professores ao longo das semanas de coleta
+modelo_longitudinal <- lmer(
+  Wellbeing_Score ~ Week_Number + VAR_Q3_OVERTIME_HOURS + (1 | Participant_Code),
+  data = df
+)
+summary(modelo_longitudinal)
+
+# 6. Gráfico de Trajetória Longitudinal (Spaghetti Plot com Tendência Média)
+ggplot(df, aes(x = Week_Number, y = Wellbeing_Score, group = Participant_Code)) +
+  geom_line(alpha = 0.25, color = "steelblue") +
+  stat_summary(aes(group = 1), fun = mean, geom = "line", color = "darkred", size = 1.3) +
+  theme_minimal(base_size = 13) +
+  labs(
+    title = "Evolução Temporal do Escore de Bem-Estar Docente por Semana",
+    subtitle = "${targetCamp?.title}",
+    x = "Semana de Acompanhamento (Check-in Semanal)",
+    y = "Índice de Bem-Estar (0 - 100)"
+  )
+`;
+  }
+
+  // PYTHON SCRIPT GENERATOR FOR PANDAS / STATSMODELS
+  public generatePythonScript(campaignId?: string): string {
+    const targetCamp = this.campaigns.find(c => c.id === campaignId) || this.campaigns[0];
+
+    return `# =========================================================================
+# SCRIPT PYTHON: MODELAGEM ESTATÍSTICA PARA PESQUISA EM PSICOLOGIA
+# Estudo: ${targetCamp?.title}
+# =========================================================================
+
+import pandas as pd
+import numpy as np
+import scipy.stats as stats
+import statsmodels.api as sm
+import statsmodels.formula.api as smf
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+# 1. Carregar dados exportados
+df = pd.read_csv('dados_pesquisa_${targetCamp?.id || 'coorte'}.csv')
+
+# 2. Resumo descritivo da amostra
+print("=== Estatísticas Descritivas ===")
+print(df[['Wellbeing_Score', 'VAR_Q2_STRESS_SLIDER', 'VAR_Q3_OVERTIME_HOURS']].describe())
+
+# 3. Teste de Normalidade (Shapiro-Wilk)
+stat, p_val = stats.shapiro(df['Wellbeing_Score'].dropna())
+print(f"Teste Shapiro-Wilk: W={stat:.4f}, p-valor={p_val:.4f}")
+
+# 4. Modelo Linear Misto (Efeito Fixo: Semana e Horas Extras; Efeito Aleatório: Participante)
+md = smf.mixedlm("Wellbeing_Score ~ Week_Number + VAR_Q3_OVERTIME_HOURS", df, groups=df["Participant_Code"])
+mdf = md.fit()
+print(mdf.summary())
+`;
+  }
+
+  // DISPATCH FLAGSHIP WEEKLY CHECK-IN NOTIFICATION (TEACHERS WEEKLY DISPATCH)
+  public triggerWeeklyTeacherCheckin(campaignId: string) {
+    const camp = this.campaigns.find(c => c.id === campaignId) || this.campaigns[0];
+    const weekIdx = camp.researchMetadata?.currentWeekIndex || 4;
+
+    return this.sendCampaignNotification(
+      camp.id,
+      camp.title,
+      'push',
+      `Check-in Semanal Docente (Semana ${weekIdx}): Como foi sua semana?`,
+      `Olá, professor(a)! Sua saúde mental importa. Responda ao breve check-in da Semana ${weekIdx} sobre seus dias de aula e acesse suporte confidencial.`,
+      'professores-coorte@escolas.org'
+    );
   }
 
   // RESET

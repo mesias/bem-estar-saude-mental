@@ -114,6 +114,7 @@ export const UserView: React.FC<UserViewProps> = ({
       userName: currentUser.name,
       userEmail: currentUser.email,
       userDepartment: currentUser.department,
+      weekNumber: activeCampaign?.researchMetadata?.currentWeekIndex || 4,
       answers,
     });
 
@@ -158,6 +159,55 @@ export const UserView: React.FC<UserViewProps> = ({
               </p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Flagship Weekly Teacher Check-in Journey */}
+      <div className="rounded-2xl border border-amber-200 bg-amber-50/70 p-5 dark:border-amber-900/50 dark:bg-amber-950/20 space-y-3">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-500 text-white shadow-xs">
+              <Calendar className="h-4 w-4" />
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-amber-950 dark:text-amber-200">
+                Estudo Insígnia: Check-in Semanal do Professor
+              </h3>
+              <p className="text-[11px] text-amber-800/90 dark:text-amber-300/80">
+                Você recebe uma notificação todo <strong>domingo às 19:00</strong> para registrar como foi sua semana de trabalho.
+              </p>
+            </div>
+          </div>
+          <span className="rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-bold text-amber-900 dark:bg-amber-900/60 dark:text-amber-200 w-fit">
+            Semana 4 de 12
+          </span>
+        </div>
+
+        {/* Weekly Timeline Steps */}
+        <div className="grid grid-cols-4 gap-2 pt-2 text-center text-xs">
+          <div className="rounded-xl border border-emerald-300 bg-emerald-100/70 p-2 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300">
+            <span className="block text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">Semana 1</span>
+            <span className="font-bold text-[11px]">78 / 100</span>
+            <span className="block text-[9px] text-emerald-600 dark:text-emerald-400">Concluída</span>
+          </div>
+
+          <div className="rounded-xl border border-emerald-300 bg-emerald-100/70 p-2 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300">
+            <span className="block text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">Semana 2</span>
+            <span className="font-bold text-[11px]">72 / 100</span>
+            <span className="block text-[9px] text-emerald-600 dark:text-emerald-400">Concluída</span>
+          </div>
+
+          <div className="rounded-xl border border-emerald-300 bg-emerald-100/70 p-2 text-emerald-900 dark:bg-emerald-950/40 dark:border-emerald-800 dark:text-emerald-300">
+            <span className="block text-[10px] font-semibold text-emerald-700 dark:text-emerald-400">Semana 3</span>
+            <span className="font-bold text-[11px]">65 / 100</span>
+            <span className="block text-[9px] text-emerald-600 dark:text-emerald-400">Concluída</span>
+          </div>
+
+          <div className="rounded-xl border-2 border-amber-500 bg-white p-2 text-amber-900 dark:bg-slate-800 dark:text-amber-200 shadow-sm ring-2 ring-amber-400/30">
+            <span className="block text-[10px] font-bold text-amber-700 dark:text-amber-400">Semana 4</span>
+            <span className="font-extrabold text-[11px] text-amber-600">Aberta</span>
+            <span className="block text-[9px] text-amber-700 font-semibold animate-pulse">Responder Hoje</span>
+          </div>
         </div>
       </div>
 

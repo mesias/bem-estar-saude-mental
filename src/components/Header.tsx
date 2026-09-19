@@ -9,7 +9,8 @@ import {
   Database,
   Github,
   AlertTriangle,
-  Wind
+  Wind,
+  GraduationCap
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -22,6 +23,7 @@ interface HeaderProps {
   onOpenFirebaseModal: () => void;
   onOpenExpoModal: () => void;
   onOpenBreathingModal: () => void;
+  onOpenResearchModal: () => void;
   onAlertBadgeClick: () => void;
 }
 
@@ -34,6 +36,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenFirebaseModal,
   onOpenExpoModal,
   onOpenBreathingModal,
+  onOpenResearchModal,
   onAlertBadgeClick,
 }) => {
   return (
@@ -47,14 +50,14 @@ export const Header: React.FC<HeaderProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg">
-                Bem-Estar Saúde Mental
+                PsychoResearch Hub
               </h1>
               <span className="hidden rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 sm:inline-block border border-teal-200 dark:border-teal-800">
-                Saúde Mental do Professor
+                Flagship: Bem-Estar Docente
               </span>
             </div>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              Plataforma Multi-Persona &middot; Firebase Firestore &middot; Expo Android
+              Pesquisas em Psicologia &middot; Mestrado e Doutorado &middot; Análise Estatística (SPSS / R)
             </p>
           </div>
         </div>
@@ -124,6 +127,17 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="lg:hidden">{unacknowledgedAlertsCount}</span>
             </button>
           )}
+
+          {/* Statistical Lab Modal Button */}
+          <button
+            id="btn-statistical-lab"
+            onClick={onOpenResearchModal}
+            className="flex items-center gap-1.5 rounded-lg bg-purple-600 px-2.5 py-1.5 text-xs font-bold text-white shadow-sm hover:bg-purple-700 transition-colors"
+            title="Laboratório de Estatística & Pós-Graduação (SPSS, R, Python)"
+          >
+            <GraduationCap className="h-3.5 w-3.5" />
+            <span className="hidden lg:inline">Lab Estatística</span>
+          </button>
 
           {/* Quick Breathing Exercise */}
           <button

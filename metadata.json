@@ -1,6 +1,6 @@
 {
   "name": "Bem-Estar Saúde Mental",
-  "description": "Multi-persona mental health assessment platform with campaign management, custom clinical forms, risk alerts, real-time analytics, and Expo mobile architecture.",
+  "description": "Plataforma de pesquisas em psicologia e estudos estatísticos para institutos universitários (mestrado e doutorado), com o estudo flagship semanal de saúde mental docente, análises em tempo real e exportações para SPSS, R e Python.",
   "requestFramePermissions": [],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }
