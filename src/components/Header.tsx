@@ -10,7 +10,9 @@ import {
   Github,
   AlertTriangle,
   Wind,
-  GraduationCap
+  GraduationCap,
+  Sparkles,
+  LogOut
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -25,6 +27,8 @@ interface HeaderProps {
   onOpenBreathingModal: () => void;
   onOpenResearchModal: () => void;
   onAlertBadgeClick: () => void;
+  isolatedUserMode?: boolean;
+  onExitIsolatedMode?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -38,7 +42,60 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenBreathingModal,
   onOpenResearchModal,
   onAlertBadgeClick,
+  isolatedUserMode = false,
+  onExitIsolatedMode,
 }) => {
+  // If isolated user mode is active, show only clean participant interface (no manager/psychology tabs)
+  if (isolatedUserMode) {
+    return (
+      <header className="sticky top-0 z-40 border-b border-teal-100 bg-white/95 backdrop-blur-md dark:border-teal-900/40 dark:bg-slate-900/95">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-teal-600 text-white shadow-md shadow-teal-600/20">
+              <HeartHandshake className="h-6 w-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h1 className="text-base font-bold tracking-tight text-slate-900 dark:text-white sm:text-lg">
+                  Bem-Estar Docente
+                </h1>
+                <span className="rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 border border-teal-200 dark:border-teal-800">
+                  Portal do Participante
+                </span>
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Avaliação de Saúde Mental & Apoio Psicológico Docente
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              id="user-header-breathing"
+              onClick={onOpenBreathingModal}
+              className="flex items-center gap-1.5 rounded-xl border border-teal-200 bg-teal-50/70 px-3 py-1.5 text-xs font-semibold text-teal-800 hover:bg-teal-100 dark:border-teal-900/50 dark:bg-teal-950/40 dark:text-teal-300 transition-colors"
+              title="Exercício de Respiração Guiada 4-7-8"
+            >
+              <Wind className="h-3.5 w-3.5 text-teal-600 dark:text-teal-400" />
+              <span>Respiração 4-7-8</span>
+            </button>
+
+            {onExitIsolatedMode && (
+              <button
+                id="btn-switch-to-portal"
+                onClick={onExitIsolatedMode}
+                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
+                title="Acessar painel completo de gestão"
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="hidden sm:inline">Painel Geral</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </header>
+    );
+  }
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur-md dark:border-slate-800 dark:bg-slate-900/95">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-4 py-3 sm:px-6">

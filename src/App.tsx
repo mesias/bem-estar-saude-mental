@@ -12,8 +12,23 @@ import { UserRole, Campaign, AssessmentForm, FormResponse, ClinicalIntervention 
 import { AlertTriangle, Sparkles, HeartHandshake, Shield, Smartphone } from 'lucide-react';
 
 export default function App() {
-  const [currentRole, setCurrentRole] = useState<UserRole>('manager');
+  // Parse URL query parameters synchronously on initial evaluation
+  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+  const roleParam = searchParams?.get('role')?.toLowerCase();
+  const formIdParam = searchParams?.get('formId') || null;
+
+  // Determine initial role: if ?role=user (or professor/docente/participant), activate user role immediately
+  const isDirectUserUrl = roleParam === 'user' || roleParam === 'professor' || roleParam === 'docente' || roleParam === 'participant';
+  const initialRole: UserRole = isDirectUserUrl
+    ? 'user'
+    : roleParam === 'psychologist' || roleParam === 'psicologia'
+    ? 'psychologist'
+    : 'manager';
+
+  const [currentRole, setCurrentRole] = useState<UserRole>(initialRole);
   const [isMobilePreview, setIsMobilePreview] = useState(false);
+  const [isolatedUserMode, setIsolatedUserMode] = useState(isDirectUserUrl);
+  const [targetFormId, setTargetFormId] = useState<string | null>(formIdParam);
 
   // Core data states
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -36,7 +51,37 @@ export default function App() {
 
   useEffect(() => {
     refreshData();
+
+    // Listen to browser popstate / search parameter changes if navigated
+    const params = new URLSearchParams(window.location.search);
+    const paramRole = params.get('role')?.toLowerCase();
+    const paramForm = params.get('formId');
+
+    if (paramRole === 'user' || paramRole === 'docente' || paramRole === 'professor') {
+      setCurrentRole('user');
+      setIsolatedUserMode(true);
+    } else if (paramRole === 'psychologist' || paramRole === 'psicologia') {
+      setCurrentRole('psychologist');
+      setIsolatedUserMode(false);
+    } else if (paramRole === 'manager' || paramRole === 'gestor') {
+      setCurrentRole('manager');
+      setIsolatedUserMode(false);
+    }
+
+    if (paramForm) {
+      setTargetFormId(paramForm);
+    }
   }, []);
+
+  const handleExitIsolatedMode = () => {
+    // Remove ?role from URL cleanly without full reload
+    const url = new URL(window.location.href);
+    url.searchParams.delete('role');
+    url.searchParams.delete('formId');
+    window.history.pushState({}, '', url.pathname);
+    setIsolatedUserMode(false);
+    setCurrentRole('manager');
+  };
 
   // Calculate unacknowledged risk alerts
   const unacknowledgedAlerts = responses.filter(r => r.isRiskAlert && !r.alertAcknowledged);
@@ -48,9 +93,8 @@ export default function App() {
         currentRole={currentRole}
         onRoleChange={role => {
           setCurrentRole(role);
-          // If switching to user and wanting mobile experience, optionally toggle
-          if (role === 'user' && !isMobilePreview) {
-            // User can stay on web or toggle to mobile
+          if (role !== 'user') {
+            setIsolatedUserMode(false);
           }
         }}
         isMobilePreview={isMobilePreview}
@@ -59,11 +103,14 @@ export default function App() {
         onOpenFirebaseModal={() => setShowFirebaseModal(true)}
         onOpenExpoModal={() => setShowExpoModal(true)}
         onOpenBreathingModal={() => setShowBreathingModal(true)}
+        onOpenResearchModal={() => {}}
         onAlertBadgeClick={() => setCurrentRole('psychologist')}
+        isolatedUserMode={isolatedUserMode}
+        onExitIsolatedMode={handleExitIsolatedMode}
       />
 
       {/* Persistent Critical Safety Alert Bar for Psychology / Manager */}
-      {unacknowledgedAlerts.length > 0 && currentRole !== 'user' && (
+      {!isolatedUserMode && unacknowledgedAlerts.length > 0 && currentRole !== 'user' && (
         <div className="bg-rose-600 px-4 py-2 text-white shadow-xs">
           <div className="mx-auto flex max-w-7xl items-center justify-between text-xs">
             <div className="flex items-center gap-2 font-medium">
@@ -83,7 +130,7 @@ export default function App() {
       )}
 
       {/* Main Content Area */}
-      <main className="flex-1 mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className={`flex-1 mx-auto w-full px-4 py-6 sm:px-6 sm:py-8 ${isolatedUserMode ? 'max-w-4xl' : 'max-w-7xl'}`}>
         {/* If Mobile Simulator Preview is ON */}
         {isMobilePreview ? (
           <MobilePhoneFrame
@@ -124,6 +171,8 @@ export default function App() {
                 responses={responses}
                 onResponseSubmitted={refreshData}
                 onOpenBreathingModal={() => setShowBreathingModal(true)}
+                initialFormId={targetFormId}
+                isolatedMode={isolatedUserMode}
               />
             )}
           </>
@@ -131,32 +180,38 @@ export default function App() {
       </main>
 
       {/* Footer Info & Disclaimers */}
-      <footer className="border-t border-slate-200 bg-white py-4 dark:border-slate-800 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
-        <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 sm:flex-row sm:px-6">
-          <div className="flex items-center gap-2">
-            <HeartHandshake className="h-4 w-4 text-teal-600" />
-            <span className="font-semibold text-slate-700 dark:text-slate-300">Bem-Estar Saúde Mental</span>
-            <span>&middot; Plataforma Open Source para Pesquisa e Cuidado Docente</span>
-          </div>
+      {!isolatedUserMode ? (
+        <footer className="border-t border-slate-200 bg-white py-4 dark:border-slate-800 dark:bg-slate-900 text-xs text-slate-500 dark:text-slate-400">
+          <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-3 px-4 sm:flex-row sm:px-6">
+            <div className="flex items-center gap-2">
+              <HeartHandshake className="h-4 w-4 text-teal-600" />
+              <span className="font-semibold text-slate-700 dark:text-slate-300">Bem-Estar Saúde Mental</span>
+              <span>&middot; Plataforma Open Source para Pesquisa e Cuidado Docente</span>
+            </div>
 
-          <div className="flex flex-wrap items-center gap-4 text-[11px]">
-            <button
-              onClick={() => setShowFirebaseModal(true)}
-              className="hover:text-slate-800 dark:hover:text-white transition-colors"
-            >
-              Firestore: <span className="font-mono text-emerald-600">bemestarsaudemental</span>
-            </button>
-            <button
-              onClick={() => setShowExpoModal(true)}
-              className="hover:text-slate-800 dark:hover:text-white transition-colors flex items-center gap-1"
-            >
-              <Smartphone className="h-3 w-3" />
-              Arquitetura Expo Android
-            </button>
-            <span className="text-slate-400">Sigilo CFP Resolução 11/2018</span>
+            <div className="flex flex-wrap items-center gap-4 text-[11px]">
+              <button
+                onClick={() => setShowFirebaseModal(true)}
+                className="hover:text-slate-800 dark:hover:text-white transition-colors"
+              >
+                Firestore: <span className="font-mono text-emerald-600">bemestarsaudemental</span>
+              </button>
+              <button
+                onClick={() => setShowExpoModal(true)}
+                className="hover:text-slate-800 dark:hover:text-white transition-colors flex items-center gap-1"
+              >
+                <Smartphone className="h-3 w-3" />
+                Arquitetura Expo Android
+              </button>
+              <span className="text-slate-400">Sigilo CFP Resolução 11/2018</span>
+            </div>
           </div>
-        </div>
-      </footer>
+        </footer>
+      ) : (
+        <footer className="border-t border-slate-200 bg-white/50 py-3 dark:border-slate-800 dark:bg-slate-900/50 text-[11px] text-slate-400 text-center">
+          <span>Ambiente Seguro & Confidencial &middot; Resolução CFP 11/2018 &middot; TCLE Digital</span>
+        </footer>
+      )}
 
       {/* Global Modals */}
       <GuidedBreathingModal

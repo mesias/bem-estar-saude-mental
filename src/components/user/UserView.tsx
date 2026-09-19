@@ -16,7 +16,10 @@ import {
   Award,
   ArrowLeft,
   X,
-  FileCheck
+  FileCheck,
+  Share2,
+  Copy,
+  Check
 } from 'lucide-react';
 import {
   Campaign,
@@ -34,6 +37,8 @@ interface UserViewProps {
   onResponseSubmitted: () => void;
   onOpenBreathingModal: () => void;
   isMobileLayout?: boolean;
+  initialFormId?: string | null;
+  isolatedMode?: boolean;
 }
 
 export const UserView: React.FC<UserViewProps> = ({
@@ -43,12 +48,42 @@ export const UserView: React.FC<UserViewProps> = ({
   onResponseSubmitted,
   onOpenBreathingModal,
   isMobileLayout = false,
+  initialFormId = null,
+  isolatedMode = false,
 }) => {
-  const [selectedForm, setSelectedForm] = useState<AssessmentForm | null>(forms[0] || null);
-  const [isAnswering, setIsAnswering] = useState(false);
+  const [selectedForm, setSelectedForm] = useState<AssessmentForm | null>(() => {
+    if (initialFormId) {
+      const match = forms.find(f => f.id === initialFormId);
+      if (match) return match;
+    }
+    return forms[0] || null;
+  });
+  const [isAnswering, setIsAnswering] = useState(() => Boolean(initialFormId));
   const [answers, setAnswers] = useState<Record<string, any>>({});
   const [justSubmittedResponse, setJustSubmittedResponse] = useState<FormResponse | null>(null);
   const [uploadedFileName, setUploadedFileName] = useState<string | null>(null);
+  const [copiedLink, setCopiedLink] = useState<string | null>(null);
+
+  // Sync when initialFormId changes
+  React.useEffect(() => {
+    if (initialFormId) {
+      const found = forms.find(f => f.id === initialFormId);
+      if (found) {
+        setSelectedForm(found);
+        setIsAnswering(true);
+      }
+    }
+  }, [initialFormId, forms]);
+
+  const handleCopyShareLink = (formId?: string) => {
+    const origin = window.location.origin;
+    const url = formId 
+      ? `${origin}/?role=user&formId=${formId}` 
+      : `${origin}/?role=user`;
+    navigator.clipboard.writeText(url);
+    setCopiedLink(formId || 'all');
+    setTimeout(() => setCopiedLink(null), 3000);
+  };
 
   // User Profile
   const currentUser = {
@@ -579,13 +614,34 @@ export const UserView: React.FC<UserViewProps> = ({
                       {form.questions.length} perguntas &middot; ~4 min
                     </span>
 
-                    <button
-                      id={`btn-start-form-${form.id}`}
-                      onClick={() => handleStartForm(form)}
-                      className="flex items-center gap-1 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-700 transition-colors"
-                    >
-                      Preencher Agora <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyShareLink(form.id)}
+                        className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-[11px] font-medium text-slate-600 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 transition-colors"
+                        title="Copiar link direto para este questionário específico"
+                      >
+                        {copiedLink === form.id ? (
+                          <>
+                            <Check className="h-3.5 w-3.5 text-emerald-600" />
+                            <span className="text-emerald-700 font-semibold">Copiado!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="h-3.5 w-3.5 text-slate-500" />
+                            <span>Compartilhar</span>
+                          </>
+                        )}
+                      </button>
+
+                      <button
+                        id={`btn-start-form-${form.id}`}
+                        onClick={() => handleStartForm(form)}
+                        className="flex items-center gap-1 rounded-xl bg-teal-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-teal-700 transition-colors"
+                      >
+                        Preencher Agora <ChevronRight className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
