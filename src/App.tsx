@@ -11,24 +11,52 @@ import { dataService } from './services/dataService';
 import { UserRole, Campaign, AssessmentForm, FormResponse, ClinicalIntervention } from './types';
 import { AlertTriangle, Sparkles, HeartHandshake, Shield, Smartphone } from 'lucide-react';
 
+function getRouteState(): { role: UserRole; isIsolated: boolean; formId: string | null } {
+  if (typeof window === 'undefined') {
+    return { role: 'user', isIsolated: true, formId: null };
+  }
+
+  const path = window.location.pathname.toLowerCase();
+  const hash = window.location.hash.toLowerCase();
+  const searchParams = new URLSearchParams(window.location.search);
+  const roleParam = searchParams.get('role')?.toLowerCase();
+  const formIdParam = searchParams.get('formId') || null;
+
+  const isManagementRoute =
+    path.startsWith('/gestao') ||
+    path.startsWith('/painel') ||
+    path.startsWith('/admin') ||
+    hash.includes('gestao') ||
+    hash.includes('painel') ||
+    hash.includes('admin') ||
+    roleParam === 'manager' ||
+    roleParam === 'gestor' ||
+    roleParam === 'admin';
+
+  const isPsychRoute =
+    path.startsWith('/psicologia') ||
+    hash.includes('psicologia') ||
+    roleParam === 'psychologist' ||
+    roleParam === 'psicologia';
+
+  if (isPsychRoute) {
+    return { role: 'psychologist', isIsolated: false, formId: formIdParam };
+  }
+
+  if (isManagementRoute) {
+    return { role: 'manager', isIsolated: false, formId: formIdParam };
+  }
+
+  // Default is 100% ISOLATED PARTICIPANT (Docente)
+  return { role: 'user', isIsolated: true, formId: formIdParam };
+}
+
 export default function App() {
-  // Parse URL query parameters synchronously on initial evaluation
-  const searchParams = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-  const roleParam = searchParams?.get('role')?.toLowerCase();
-  const formIdParam = searchParams?.get('formId') || null;
-
-  // Determine initial role: if ?role=user (or professor/docente/participant), activate user role immediately
-  const isDirectUserUrl = roleParam === 'user' || roleParam === 'professor' || roleParam === 'docente' || roleParam === 'participant';
-  const initialRole: UserRole = isDirectUserUrl
-    ? 'user'
-    : roleParam === 'psychologist' || roleParam === 'psicologia'
-    ? 'psychologist'
-    : 'manager';
-
-  const [currentRole, setCurrentRole] = useState<UserRole>(initialRole);
+  const initialRoute = getRouteState();
+  const [currentRole, setCurrentRole] = useState<UserRole>(initialRoute.role);
   const [isMobilePreview, setIsMobilePreview] = useState(false);
-  const [isolatedUserMode, setIsolatedUserMode] = useState(isDirectUserUrl);
-  const [targetFormId, setTargetFormId] = useState<string | null>(formIdParam);
+  const [isolatedUserMode, setIsolatedUserMode] = useState(initialRoute.isIsolated);
+  const [targetFormId, setTargetFormId] = useState<string | null>(initialRoute.formId);
 
   // Core data states
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -51,36 +79,46 @@ export default function App() {
 
   useEffect(() => {
     refreshData();
+    const unsubscribeData = dataService.subscribe(refreshData);
 
-    // Listen to browser popstate / search parameter changes if navigated
-    const params = new URLSearchParams(window.location.search);
-    const paramRole = params.get('role')?.toLowerCase();
-    const paramForm = params.get('formId');
+    const handleLocationChange = () => {
+      const route = getRouteState();
+      setCurrentRole(route.role);
+      setIsolatedUserMode(route.isIsolated);
+      if (route.formId) {
+        setTargetFormId(route.formId);
+      }
+    };
 
-    if (paramRole === 'user' || paramRole === 'docente' || paramRole === 'professor') {
-      setCurrentRole('user');
-      setIsolatedUserMode(true);
-    } else if (paramRole === 'psychologist' || paramRole === 'psicologia') {
-      setCurrentRole('psychologist');
-      setIsolatedUserMode(false);
-    } else if (paramRole === 'manager' || paramRole === 'gestor') {
-      setCurrentRole('manager');
-      setIsolatedUserMode(false);
-    }
+    window.addEventListener('popstate', handleLocationChange);
+    window.addEventListener('hashchange', handleLocationChange);
 
-    if (paramForm) {
-      setTargetFormId(paramForm);
-    }
+    return () => {
+      unsubscribeData();
+      window.removeEventListener('popstate', handleLocationChange);
+      window.removeEventListener('hashchange', handleLocationChange);
+    };
   }, []);
 
   const handleExitIsolatedMode = () => {
-    // Remove ?role from URL cleanly without full reload
+    // Switch to management mode cleanly
     const url = new URL(window.location.href);
     url.searchParams.delete('role');
     url.searchParams.delete('formId');
-    window.history.pushState({}, '', url.pathname);
+    if (!url.pathname.includes('/gestao') && !url.hash.includes('gestao')) {
+      window.history.pushState({}, '', '/gestao');
+    }
     setIsolatedUserMode(false);
     setCurrentRole('manager');
+  };
+
+  const handleSwitchToUserMode = () => {
+    // Switch to isolated participant/user mode cleanly
+    const url = new URL(window.location.href);
+    url.searchParams.delete('role');
+    window.history.pushState({}, '', '/');
+    setIsolatedUserMode(true);
+    setCurrentRole('user');
   };
 
   // Calculate unacknowledged risk alerts
@@ -92,9 +130,15 @@ export default function App() {
       <Header
         currentRole={currentRole}
         onRoleChange={role => {
-          setCurrentRole(role);
-          if (role !== 'user') {
+          if (role === 'user') {
+            handleSwitchToUserMode();
+          } else {
+            setCurrentRole(role);
             setIsolatedUserMode(false);
+            const url = new URL(window.location.href);
+            if (!url.pathname.includes('/gestao') && !url.hash.includes('gestao')) {
+              window.history.pushState({}, '', '/gestao');
+            }
           }
         }}
         isMobilePreview={isMobilePreview}
@@ -146,8 +190,11 @@ export default function App() {
             {currentRole === 'manager' && (
               <ManagerView
                 campaigns={campaigns}
+                forms={forms}
                 responses={responses}
                 onCampaignCreated={refreshData}
+                onSwitchToUserView={handleSwitchToUserMode}
+                onNavigateToForms={() => setCurrentRole('psychologist')}
               />
             )}
 

@@ -14,7 +14,7 @@ import {
   INITIAL_INTERVENTIONS,
   INITIAL_USERS
 } from '../data/initialData';
-import { db, collection, getDocs, setDoc, doc } from '../firebase/config';
+import { db, collection, getDocs, setDoc, doc, onSnapshot } from '../firebase/config';
 
 const STORAGE_KEYS = {
   CAMPAIGNS: 'bemestar_campaigns_v1',
@@ -54,9 +54,27 @@ class DataService {
   private interventions: ClinicalIntervention[] = [];
   private notifications: NotificationLog[] = [];
   private users: UserProfile[] = [];
+  private listeners: (() => void)[] = [];
 
   constructor() {
     this.init();
+  }
+
+  public subscribe(cb: () => void): () => void {
+    this.listeners.push(cb);
+    return () => {
+      this.listeners = this.listeners.filter(l => l !== cb);
+    };
+  }
+
+  private notifyListeners() {
+    this.listeners.forEach(cb => {
+      try {
+        cb();
+      } catch (e) {
+        console.error('DataService listener error:', e);
+      }
+    });
   }
 
   private async init() {
@@ -79,17 +97,82 @@ class DataService {
       }
     ]);
 
-    // Try background sync with Firestore if online and collection exists
+    // Live sync with Firestore if online and configured
     if (db) {
       try {
+        // 1. Initial seed/sync Campaigns
         const campSnap = await getDocs(collection(db, 'campaigns'));
         if (!campSnap.empty) {
           const remoteCamp = campSnap.docs.map(d => ({ id: d.id, ...d.data() } as Campaign));
           this.campaigns = remoteCamp;
           saveLocal(STORAGE_KEYS.CAMPAIGNS, this.campaigns);
+        } else {
+          // Seed defaults to Firestore
+          for (const c of INITIAL_CAMPAIGNS) {
+            await setDoc(doc(db, 'campaigns', c.id), c);
+          }
         }
+
+        // 2. Initial seed/sync Forms
+        const formSnap = await getDocs(collection(db, 'forms'));
+        if (!formSnap.empty) {
+          const remoteForms = formSnap.docs.map(d => ({ id: d.id, ...d.data() } as AssessmentForm));
+          const existingIds = new Set(remoteForms.map(f => f.id));
+          this.forms = [...remoteForms, ...INITIAL_FORMS.filter(f => !existingIds.has(f.id))];
+          saveLocal(STORAGE_KEYS.FORMS, this.forms);
+        } else {
+          for (const f of INITIAL_FORMS) {
+            await setDoc(doc(db, 'forms', f.id), f);
+          }
+        }
+
+        // 3. Initial sync Responses
+        const respSnap = await getDocs(collection(db, 'responses'));
+        if (!respSnap.empty) {
+          const remoteResp = respSnap.docs.map(d => ({ id: d.id, ...d.data() } as FormResponse));
+          remoteResp.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+          this.responses = remoteResp;
+          saveLocal(STORAGE_KEYS.RESPONSES, this.responses);
+        }
+
+        this.notifyListeners();
+
+        // 4. Real-time Listeners (onSnapshot) for live multi-device synchronization
+        onSnapshot(collection(db, 'responses'), (snap) => {
+          if (!snap.empty) {
+            const liveResp = snap.docs.map(d => ({ id: d.id, ...d.data() } as FormResponse));
+            liveResp.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+            this.responses = liveResp;
+            saveLocal(STORAGE_KEYS.RESPONSES, this.responses);
+            this.notifyListeners();
+          }
+        }, (err) => {
+          console.warn('Live responses sync notice:', err);
+        });
+
+        onSnapshot(collection(db, 'campaigns'), (snap) => {
+          if (!snap.empty) {
+            this.campaigns = snap.docs.map(d => ({ id: d.id, ...d.data() } as Campaign));
+            saveLocal(STORAGE_KEYS.CAMPAIGNS, this.campaigns);
+            this.notifyListeners();
+          }
+        }, (err) => {
+          console.warn('Live campaigns sync notice:', err);
+        });
+
+        onSnapshot(collection(db, 'forms'), (snap) => {
+          if (!snap.empty) {
+            const liveForms = snap.docs.map(d => ({ id: d.id, ...d.data() } as AssessmentForm));
+            const existingIds = new Set(liveForms.map(f => f.id));
+            this.forms = [...liveForms, ...INITIAL_FORMS.filter(f => !existingIds.has(f.id))];
+            saveLocal(STORAGE_KEYS.FORMS, this.forms);
+            this.notifyListeners();
+          }
+        }, (err) => {
+          console.warn('Live forms sync notice:', err);
+        });
       } catch (e) {
-        // Fallback gracefully to local/in-memory
+        console.warn('Firestore initialization sync notice (operating in local offline-cache mode):', e);
       }
     }
   }

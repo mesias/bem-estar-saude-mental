@@ -20,10 +20,13 @@ import {
   ShieldCheck,
   Share2,
   Copy,
-  ExternalLink
+  ExternalLink,
+  UserCheck,
+  FileQuestion
 } from 'lucide-react';
 import {
   Campaign,
+  AssessmentForm,
   NotificationMode,
   ReminderFrequency,
   FormResponse,
@@ -34,17 +37,23 @@ import { dataService } from '../../services/dataService';
 
 interface ManagerViewProps {
   campaigns: Campaign[];
+  forms?: AssessmentForm[];
   responses: FormResponse[];
   onCampaignCreated: () => void;
   onSelectCampaignForForms?: (campaignId: string) => void;
   onOpenStatisticalLab?: () => void;
+  onSwitchToUserView?: () => void;
+  onNavigateToForms?: () => void;
 }
 
 export const ManagerView: React.FC<ManagerViewProps> = ({
   campaigns,
+  forms = [],
   responses,
   onCampaignCreated,
   onOpenStatisticalLab,
+  onSwitchToUserView,
+  onNavigateToForms,
 }) => {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCampaignId, setSelectedCampaignId] = useState<string>(campaigns[0]?.id || '');
@@ -52,9 +61,10 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
   const [csvDownloaded, setCsvDownloaded] = useState(false);
   const [dispatchSuccess, setDispatchSuccess] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedLinkType, setCopiedLinkType] = useState<'user' | 'manager' | null>(null);
 
   const handleCopyUserLink = () => {
-    const userUrl = `${window.location.origin}/?role=user`;
+    const userUrl = `${window.location.origin}/`;
     navigator.clipboard.writeText(userUrl);
     setCopiedLink(true);
     setTimeout(() => setCopiedLink(false), 3000);
@@ -247,6 +257,115 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Distinct Links Card (Participant vs. Management) */}
+      <div className="rounded-2xl border border-teal-200 bg-gradient-to-r from-teal-50/80 via-emerald-50/40 to-blue-50/60 p-4 sm:p-5 shadow-xs dark:border-teal-900/40 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800/80">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <div className="flex items-center gap-2">
+              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white">
+                Links Separados do Sistema (Respondentes vs. Gestão)
+              </h3>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 max-w-xl">
+              Os professores e alunos respondem em uma interface 100% isolada e confidencial. Eles nunca veem este painel nem respostas de colegas.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Participant Public Link */}
+            <div className="flex items-center gap-2 rounded-xl border border-teal-300 bg-white px-3.5 py-2 shadow-xs dark:border-teal-800 dark:bg-slate-900">
+              <div className="text-left">
+                <span className="block text-[10px] font-extrabold uppercase tracking-wide text-teal-700 dark:text-teal-400">
+                  Link dos Docentes / Alunos
+                </span>
+                <span className="block font-mono text-xs font-medium text-slate-700 dark:text-slate-200">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/` : '/'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = `${window.location.origin}/`;
+                  navigator.clipboard.writeText(url);
+                  setCopiedLinkType('user');
+                  setTimeout(() => setCopiedLinkType(null), 3000);
+                }}
+                className="ml-1 rounded-lg bg-teal-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-teal-700 transition-colors flex items-center gap-1"
+                title="Copiar link para enviar no WhatsApp ou E-mail aos participantes"
+              >
+                {copiedLinkType === 'user' ? (
+                  <>
+                    <Check className="h-3 w-3" />
+                    <span>Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    <span>Copiar</span>
+                  </>
+                )}
+              </button>
+              {onSwitchToUserView && (
+                <button
+                  type="button"
+                  onClick={onSwitchToUserView}
+                  className="rounded-lg bg-emerald-100 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-200 dark:bg-emerald-950 dark:text-emerald-300 dark:hover:bg-emerald-900 transition-colors flex items-center gap-1"
+                  title="Mudar imediatamente para a tela do Docente neste mesmo navegador"
+                >
+                  <UserCheck className="h-3 w-3 text-emerald-600 dark:text-emerald-400" />
+                  <span>Abrir no App</span>
+                </button>
+              )}
+              <a
+                href="/"
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-lg border border-slate-200 p-1.5 text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:border-slate-700 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white transition-colors"
+                title="Abrir em nova aba para ver exatamente a tela que o docente vê"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            </div>
+
+            {/* Management Private Link */}
+            <div className="flex items-center gap-2 rounded-xl border border-purple-300 bg-white px-3.5 py-2 shadow-xs dark:border-purple-800 dark:bg-slate-900">
+              <div className="text-left">
+                <span className="block text-[10px] font-extrabold uppercase tracking-wide text-purple-700 dark:text-purple-400">
+                  Link Deste Painel de Gestão
+                </span>
+                <span className="block font-mono text-xs font-medium text-slate-700 dark:text-slate-200">
+                  {typeof window !== 'undefined' ? `${window.location.origin}/gestao` : '/gestao'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  const url = `${window.location.origin}/gestao`;
+                  navigator.clipboard.writeText(url);
+                  setCopiedLinkType('manager');
+                  setTimeout(() => setCopiedLinkType(null), 3000);
+                }}
+                className="ml-1 rounded-lg bg-purple-600 px-2.5 py-1.5 text-xs font-semibold text-white hover:bg-purple-700 transition-colors flex items-center gap-1"
+                title="Copiar link de gestão para guardar nos seus favoritos"
+              >
+                {copiedLinkType === 'manager' ? (
+                  <>
+                    <Check className="h-3 w-3" />
+                    <span>Copiado!</span>
+                  </>
+                ) : (
+                  <>
+                    <Copy className="h-3 w-3" />
+                    <span>Copiar</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -540,6 +659,58 @@ export const ManagerView: React.FC<ManagerViewProps> = ({
                   </div>
                 </div>
               )}
+
+              {/* Forms & Assessment Instruments Linked to this Campaign */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/60 p-4 dark:border-slate-800 dark:bg-slate-800/40">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <FileQuestion className="h-4 w-4 text-teal-600 dark:text-teal-400" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                      Instrumentos Psicométricos & Questionários Ativos
+                    </h4>
+                  </div>
+                  {onNavigateToForms && (
+                    <button
+                      type="button"
+                      onClick={onNavigateToForms}
+                      className="flex items-center gap-1 text-xs font-semibold text-teal-700 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      <span>Criar Novo Formulário &rarr;</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  {forms.filter(f => !f.campaignId || f.campaignId === activeCampaign?.id).map(form => (
+                    <div
+                      key={form.id}
+                      className="rounded-lg border border-slate-200 bg-white p-3 shadow-2xs dark:border-slate-700 dark:bg-slate-900"
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {form.title}
+                        </span>
+                        <span className="rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                          {form.questions.length} questões
+                        </span>
+                      </div>
+                      <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                        {form.description}
+                      </p>
+                      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-500">
+                        <span>Corte de Risco: &le; {form.safetyThreshold} pts</span>
+                        <span className="text-emerald-600 dark:text-emerald-400 font-medium">Pronto para Coleta</span>
+                      </div>
+                    </div>
+                  ))}
+                  {forms.length === 0 && (
+                    <p className="text-xs text-slate-500 py-2">
+                      Nenhum formulário encontrado. Crie um formulário no Painel de Psicologia.
+                    </p>
+                  )}
+                </div>
+              </div>
 
               {/* Responses & Real-Time Cohort Feed */}
               <div className="space-y-3">

@@ -54,7 +54,10 @@ try {
   } else {
     app = getApp();
   }
-  db = getFirestore(app);
+  const dbId = currentConfig.firestoreDatabaseId && currentConfig.firestoreDatabaseId !== '(default)'
+    ? currentConfig.firestoreDatabaseId
+    : undefined;
+  db = dbId ? getFirestore(app, dbId) : getFirestore(app);
   auth = getAuth(app);
 } catch (error) {
   console.warn('Firebase initialization notice (falling back to memory & localStorage state):', error);

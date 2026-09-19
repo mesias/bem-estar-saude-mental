@@ -12,7 +12,9 @@ import {
   Wind,
   GraduationCap,
   Sparkles,
-  LogOut
+  LogOut,
+  ShieldCheck,
+  ArrowRight
 } from 'lucide-react';
 import { UserRole } from '../types';
 
@@ -82,13 +84,14 @@ export const Header: React.FC<HeaderProps> = ({
 
             {onExitIsolatedMode && (
               <button
-                id="btn-switch-to-portal"
+                id="btn-access-management"
                 onClick={onExitIsolatedMode}
-                className="flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-400 dark:hover:text-white transition-colors"
-                title="Acessar painel completo de gestão"
+                className="flex items-center gap-1.5 rounded-xl border border-slate-300 bg-slate-100/80 px-2.5 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-200 hover:text-slate-900 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700 transition-all shadow-xs"
+                title="Alternar para o Painel de Gestão e Pesquisa"
               >
-                <LogOut className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">Painel Geral</span>
+                <ShieldCheck className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
+                <span>Painel Gestão</span>
+                <ArrowRight className="h-3 w-3 text-slate-400" />
               </button>
             )}
           </div>
@@ -171,6 +174,18 @@ export const Header: React.FC<HeaderProps> = ({
 
         {/* Right Action Icons & Controls */}
         <div className="flex items-center gap-2">
+          {/* Quick Button to go back to User/Participant App */}
+          <button
+            id="btn-switch-to-user-app"
+            onClick={() => onRoleChange('user')}
+            className="flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 transition-colors shadow-xs"
+            title="Ir para o aplicativo do participante (preenchimento dos questionários)"
+          >
+            <UserCheck className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="hidden sm:inline">Ver App do Docente</span>
+            <span className="sm:hidden">App Docente</span>
+          </button>
+
           {/* Risk Alert Warning Pill */}
           {unacknowledgedAlertsCount > 0 && (
             <button
